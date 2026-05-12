@@ -1,0 +1,42 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <ellipse cx="100" cy="170" rx="62" ry="6" fill="#000" opacity=".18" />
+  <g class="loaf-typing">
+    <path d="M40 158 C 40 116, 70 100, 100 100 C 130 100, 160 116, 160 158 Z"
+          fill="#F8F4F0" stroke="#7A6655" stroke-width="2.2" stroke-linejoin="round" />
+    <ellipse cx="100" cy="148" rx="42" ry="10" fill="#FFFFFF" opacity=".7" />
+    <!-- long bunny ears -->
+    <path d="M82 100 Q 78 56 86 50 Q 94 56 90 100 Z"
+          fill="#F8F4F0" stroke="#7A6655" stroke-width="2.2" stroke-linejoin="round" />
+    <path d="M118 100 Q 122 56 114 50 Q 106 56 110 100 Z"
+          fill="#F8F4F0" stroke="#7A6655" stroke-width="2.2" stroke-linejoin="round" />
+    <!-- inner ear -->
+    <path d="M84 96 Q 82 70 86 64 Q 90 70 88 96 Z" fill="#FFC9D9" />
+    <path d="M116 96 Q 118 70 114 64 Q 110 70 112 96 Z" fill="#FFC9D9" />
+    <!-- cheeks -->
+    <ellipse cx="80" cy="132" rx="7" ry="4" fill="#FFC9D9" opacity=".75" />
+    <ellipse cx="120" cy="132" rx="7" ry="4" fill="#FFC9D9" opacity=".75" />
+    <!-- eyes (focused) -->
+    <circle cx="86" cy="124" r="2.6" fill="#3A2535" />
+    <circle cx="114" cy="124" r="2.6" fill="#3A2535" />
+    <!-- pink bunny nose (Y-shape) -->
+    <path d="M97 132 L 103 132 L 100 135 Z" fill="#FF7AA0" stroke="#7A6655" stroke-width="1" stroke-linejoin="round" />
+    <path d="M100 135 L 100 138" stroke="#7A6655" stroke-width="1.2" stroke-linecap="round" />
+    <path d="M100 138 Q 96 140 94 139" stroke="#7A6655" stroke-width="1.3" fill="none" stroke-linecap="round" />
+    <path d="M100 138 Q 104 140 106 139" stroke="#7A6655" stroke-width="1.3" fill="none" stroke-linecap="round" />
+    <!-- whiskers -->
+    <path d="M72 134 L 58 132 M72 138 L 58 140" stroke="#7A6655" stroke-width="1" stroke-linecap="round" />
+    <path d="M128 134 L 142 132 M128 138 L 142 140" stroke="#7A6655" stroke-width="1" stroke-linecap="round" />
+    <!-- paws -->
+    <g class="paw paw-left">
+      <ellipse cx="78" cy="156" rx="9" ry="5" fill="#F8F4F0" stroke="#7A6655" stroke-width="1.6" />
+    </g>
+    <g class="paw paw-right">
+      <ellipse cx="122" cy="156" rx="9" ry="5" fill="#F8F4F0" stroke="#7A6655" stroke-width="1.6" />
+    </g>
+  </g>
+  <g class="dots">
+    <circle class="dot d1" cx="146" cy="92" r="3" fill="#7A6655" />
+    <circle class="dot d2" cx="156" cy="78" r="3.5" fill="#7A6655" />
+    <circle class="dot d3" cx="166" cy="62" r="4" fill="#7A6655" />
+  </g>
+</svg>

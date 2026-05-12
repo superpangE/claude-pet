@@ -130,30 +130,47 @@ priority: working > idle
 
 각 세션은 자기 파일(`data/sessions/<session_id>.json`)만 갱신하므로 hook끼리 경쟁이 없다. 트레이 메뉴에 현재 breakdown(예: `2 sessions: 1 working, 1 idle`)이 표시된다.
 
-## 🎨 내 그림으로 바꾸기
+## 🎨 캐릭터 & 커스텀 아트
 
-`pet-app/assets/cats/` 안에 파일을 넣으면 자동으로 기본 SVG를 대체한다.
+### 기본 제공 캐릭터
+
+`cat` / `dog` / `bunny` 3종 내장. 트레이 → **Pet** 서브메뉴에서 즉시 전환, 또는:
 
 ```
-pet-app/assets/cats/
-├── working.gif      # Claude 작업 중
-└── idle.png         # 응답 대기 / 완료
+/pet list           # 사용 가능한 캐릭터 목록
+/pet set dog        # 즉시 전환 + 영구 저장 (config.json)
 ```
 
-확장자 우선순위: `gif` → `webp` → `apng` → `png`. 권장 캔버스: **180×180**, 배경 투명. 한 상태만 넣어도 OK — 없는 상태는 기본 SVG로 떨어진다. 자세한 사양은 `pet-app/assets/cats/README.md`.
+선택은 `~/.claude/plugins/claude-pet/data/config.json` 에 `{"theme":"dog"}` 형태로 저장. 재시작 후에도 유지.
 
-새 그림을 반영하려면 트레이 → Quit (또는 `kill $(cat ~/.claude/plugins/claude-pet/data/app.pid)`) 후 다음 hook이 자동으로 다시 띄운다.
+### 내 그림으로 바꾸기 / 새 캐릭터 추가
+
+각 캐릭터는 `pet-app/assets/pets/<name>/` 폴더. 두 파일만 두면 됨:
+
+```
+pet-app/assets/pets/cat/
+├── working.svg / working.gif / working.png / ...    # Claude 작업 중
+└── idle.svg / idle.png / ...                         # 응답 대기 / 완료
+```
+
+확장자 우선순위: `gif → webp → apng → png → svg`. raster가 svg 위에 있으면 raster 우선 — ship된 SVG는 안전한 fallback으로 남고 사용자가 같은 폴더에 `working.gif` 두면 그걸 사용.
+
+권장 캔버스: **180×180**, 배경 투명. 자세한 사양과 SVG 클래스 규약(`loaf-typing`, `paw-left`, `dot`, `loaf-breathe`, `z` 등 CSS 애니메이션 hook)은 `pet-app/assets/pets/README.md` 참고.
+
+새 그림 반영하려면 트레이 → Quit 후 다음 hook이 자동으로 다시 띄운다.
 
 ## 🎬 슬래시 커맨드 — `/pet`
 
-데모/녹화 중에 펫을 잠깐 숨기고 싶을 때 Claude Code 안에서:
+데모/녹화 중에 펫을 잠깐 숨기거나 캐릭터 바꾸고 싶을 때:
 
 ```
-/pet hide   # 창 숨김
-/pet show   # 다시 보이기 (앱이 꺼져 있으면 spawn)
+/pet hide          # 창 숨김
+/pet show          # 다시 보이기 (앱이 꺼져 있으면 spawn)
+/pet list          # 사용 가능한 캐릭터 목록 (현재는 * 표시)
+/pet set <name>    # 캐릭터 전환 (영구 저장)
 ```
 
-쉘로 직접 실행되므로 LLM round-trip이나 토큰 비용 없음. 내부적으로는 `data/app.pid`로 Electron 프로세스에 `SIGUSR1`(hide) / `SIGUSR2`(show)를 보낸다.
+쉘로 직접 실행되므로 LLM round-trip이나 토큰 비용 없음. show/hide는 `data/app.pid`로 `SIGUSR1`/`SIGUSR2`. set은 `data/config.json` 원자적 write → main.js의 `fs.watch`가 라이브 반영.
 
 > 일반 제어(Show/Hide 토글, Reset position, Quit)는 트레이 메뉴에 모두 있다. 슬래시 커맨드는 키보드를 떠나기 싫을 때만 쓰면 된다.
 
@@ -183,6 +200,7 @@ pet-app/assets/cats/
 | `~/.claude/plugins/claude-pet/data/app.log` | Electron 앱 로그 |
 | `~/.claude/plugins/claude-pet/data/position.json` | 창 위치 |
 | `~/.claude/plugins/claude-pet/data/app.pid` | Electron PID (중복 방지) |
+| `~/.claude/plugins/claude-pet/data/config.json` | 선택한 캐릭터 (`{"theme":"cat"}` 등) |
 
 ## 🧪 동작 검증
 

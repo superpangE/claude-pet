@@ -1,7 +1,13 @@
-const EXTS = ['gif', 'webp', 'apng', 'png']; // animated formats first
+// Asset extensions to try, in order. Animated raster first, SVG last so a
+// user-supplied gif/png in the same pet folder overrides the shipped svg.
+const RASTER_EXTS = ['gif', 'webp', 'apng', 'png'];
+const ALL_EXTS = [...RASTER_EXTS, 'svg'];
 const MAX_DOTS = 5;
+const DEFAULT_THEME = 'cat';
+
 const petEl = document.getElementById('pet');
 const badgeEl = document.getElementById('session-badge');
+let currentTheme = null;
 
 function applyState(payload) {
   const raw = payload && payload.state;
@@ -17,7 +23,6 @@ function applyState(payload) {
 function renderBadge(payload) {
   if (!badgeEl) return;
   const states = payload && payload.sessionStates;
-
   let dots = '';
   if (Array.isArray(states) && states.length >= 2) {
     const total = states.length;
@@ -26,7 +31,6 @@ function renderBadge(payload) {
     const inner = shown.map((s) => (s === 'working' ? '●' : '○')).join('');
     dots = overflow > 0 ? `${inner}+${overflow}` : inner;
   }
-
   if (dots) {
     badgeEl.textContent = dots;
     badgeEl.classList.add('visible');
@@ -36,40 +40,69 @@ function renderBadge(payload) {
   }
 }
 
-function tryLoadCustom(state, exts, scene) {
-  if (!exts.length) return;
-  const ext = exts[0];
-  const url = `../assets/cats/${state}.${ext}`;
-  const probe = new Image();
-  probe.onload = () => {
-    if (probe.naturalWidth === 0) {
-      tryLoadCustom(state, exts.slice(1), scene);
-      return;
-    }
-    const img = document.createElement('img');
+// Pick the highest-priority asset for (theme, state). Raster wins so a user
+// drop-in gif overrides the shipped svg. Resolves to {ext, url} or null.
+function probeAsset(theme, state, exts) {
+  return new Promise((resolve) => {
+    if (!exts.length) { resolve(null); return; }
+    const [ext, ...rest] = exts;
+    const url = `../assets/pets/${theme}/${state}.${ext}`;
+    const img = new Image();
+    img.onload = () => {
+      // Browsers sometimes "succeed" on a 404 with 0×0 — guard against that.
+      if (img.naturalWidth === 0 && ext !== 'svg') {
+        probeAsset(theme, state, rest).then(resolve);
+        return;
+      }
+      resolve({ ext, url });
+    };
+    img.onerror = () => probeAsset(theme, state, rest).then(resolve);
     img.src = url;
-    img.alt = '';
-    img.className = 'custom-art';
-    // The default scenes are <svg>; HTML <img> can't render as a child of SVG.
-    // Replace the whole SVG container with an HTML <div> that mirrors the scene classes.
-    if (scene.tagName.toLowerCase() === 'svg') {
-      const div = document.createElement('div');
-      div.className = `scene scene-${state} has-custom`;
-      div.appendChild(img);
-      scene.replaceWith(div);
-    } else {
-      scene.replaceChildren(img);
-      scene.classList.add('has-custom');
-    }
-  };
-  probe.onerror = () => tryLoadCustom(state, exts.slice(1), scene);
-  probe.src = url;
+  });
 }
 
-['working', 'idle'].forEach((state) => {
+async function loadScene(state, theme) {
   const scene = document.querySelector(`.scene-${state}`);
-  if (scene) tryLoadCustom(state, EXTS.slice(), scene);
-});
+  if (!scene) return;
+  const hit = await probeAsset(theme, state, ALL_EXTS);
+  if (!hit) {
+    scene.replaceChildren();
+    scene.classList.remove('has-custom', 'has-svg');
+    return;
+  }
+  if (hit.ext === 'svg') {
+    // Inline the SVG so CSS animation rules in style.css can reach the
+    // .loaf-typing / .paw / .dot classes inside. <img src="*.svg"> would
+    // sandbox them.
+    try {
+      const res = await fetch(hit.url);
+      const text = await res.text();
+      scene.innerHTML = text;
+      scene.classList.add('has-svg');
+      scene.classList.remove('has-custom');
+    } catch (_) {
+      scene.replaceChildren();
+    }
+    return;
+  }
+  // Raster (gif/png/webp/apng) → plain <img>.
+  const img = document.createElement('img');
+  img.src = hit.url;
+  img.alt = '';
+  img.className = 'custom-art';
+  scene.replaceChildren(img);
+  scene.classList.add('has-custom');
+  scene.classList.remove('has-svg');
+}
+
+async function applyTheme(theme) {
+  const t = (theme && typeof theme === 'string') ? theme : DEFAULT_THEME;
+  if (t === currentTheme) return;
+  currentTheme = t;
+  await Promise.all([loadScene('working', t), loadScene('idle', t)]);
+}
 
 window.pet.onState((payload) => applyState(payload));
+window.pet.onTheme((theme) => applyTheme(theme));
 window.pet.getState().then(applyState).catch(() => {});
+window.pet.getTheme().then(applyTheme).catch(() => applyTheme(DEFAULT_THEME));

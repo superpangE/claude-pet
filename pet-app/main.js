@@ -17,6 +17,9 @@ const DATA_DIR =
   path.join(os.homedir(), '.claude', 'plugins', 'claude-pet', 'data');
 const POSITION_FILE = path.join(DATA_DIR, 'position.json');
 const SESSIONS_DIR = path.join(DATA_DIR, 'sessions');
+const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
+const PETS_DIR = path.join(__dirname, 'assets', 'pets');
+const DEFAULT_THEME = 'cat';
 
 const WIN_SIZE = { width: 180, height: 180 };
 // Quit if no active CC sessions for this many ms.
@@ -49,12 +52,88 @@ const dlog = (...args) => { if (DEBUG) console.log(...args); };
 let mainWindow = null;
 let tray = null;
 let watcher = null;
+let configWatcher = null;
 let pushTimer = null;
+let currentTheme = DEFAULT_THEME;
 let currentAggregate = { state: 'idle', sessionCount: 0, breakdown: {}, sessionStates: [] };
 
 function ensureDataDir() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.mkdirSync(SESSIONS_DIR, { recursive: true });
+}
+
+// Discover available pet themes by scanning the shipped assets/pets/ dir.
+// A folder counts as a theme if it has at least one of working.{svg,gif,png,
+// webp,apng} or the matching idle file. Sorted alphabetically; default first.
+function listThemes() {
+  let names = [];
+  try {
+    names = fs.readdirSync(PETS_DIR, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name);
+  } catch (_) {
+    return [DEFAULT_THEME];
+  }
+  const exts = ['svg', 'gif', 'webp', 'apng', 'png'];
+  const valid = names.filter((name) => {
+    for (const state of ['working', 'idle']) {
+      for (const e of exts) {
+        if (fs.existsSync(path.join(PETS_DIR, name, `${state}.${e}`))) return true;
+      }
+    }
+    return false;
+  });
+  if (!valid.length) return [DEFAULT_THEME];
+  valid.sort((a, b) => {
+    if (a === DEFAULT_THEME) return -1;
+    if (b === DEFAULT_THEME) return 1;
+    return a.localeCompare(b);
+  });
+  return valid;
+}
+
+function readConfig() {
+  try {
+    const raw = fs.readFileSync(CONFIG_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.theme === 'string') return parsed;
+  } catch (_) {}
+  return { theme: DEFAULT_THEME };
+}
+
+function writeConfig(cfg) {
+  try {
+    const tmp = `${CONFIG_FILE}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(cfg, null, 2));
+    fs.renameSync(tmp, CONFIG_FILE);
+  } catch (e) {
+    console.error('[claude-pet] writeConfig failed:', e);
+  }
+}
+
+function applyTheme(theme, { persist } = { persist: false }) {
+  const themes = listThemes();
+  const next = themes.includes(theme) ? theme : DEFAULT_THEME;
+  if (next === currentTheme && !persist) return;
+  currentTheme = next;
+  if (persist) writeConfig({ theme: next });
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('pet:theme', next);
+  }
+  if (tray) tray.setContextMenu(buildTrayMenu());
+}
+
+function watchConfig() {
+  if (configWatcher) {
+    try { configWatcher.close(); } catch (_) {}
+  }
+  try {
+    configWatcher = fs.watch(DATA_DIR, (_evt, filename) => {
+      if (!filename || path.basename(filename) !== 'config.json') return;
+      const cfg = readConfig();
+      applyTheme(cfg.theme, { persist: false });
+    });
+  } catch (_) {}
 }
 
 function readActiveSessions() {
@@ -318,6 +397,16 @@ function buildTrayMenu() {
       },
     },
     { type: 'separator' },
+    {
+      label: 'Pet',
+      submenu: listThemes().map((name) => ({
+        label: name,
+        type: 'radio',
+        checked: name === currentTheme,
+        click: () => applyTheme(name, { persist: true }),
+      })),
+    },
+    { type: 'separator' },
     { label: `State: ${currentAggregate.state}`, enabled: false },
     { label: `  ${formatBreakdown(currentAggregate)}`, enabled: false },
     { type: 'separator' },
@@ -336,6 +425,7 @@ function createTray() {
 }
 
 ipcMain.handle('pet:get-state', () => aggregateState());
+ipcMain.handle('pet:get-theme', () => currentTheme);
 
 // scripts/pet-control.sh sends these to toggle visibility from the
 // /pet slash command. SIGUSR1 = hide, SIGUSR2 = show.
@@ -354,10 +444,14 @@ function installControlSignals() {
 
 app.whenReady().then(() => {
   ensureDataDir();
+  // Load persisted theme before the window opens so the first render uses it.
+  currentTheme = readConfig().theme || DEFAULT_THEME;
+  if (!listThemes().includes(currentTheme)) currentTheme = DEFAULT_THEME;
   if (process.platform === 'darwin' && app.dock) app.dock.hide();
   createWindow();
   createTray();
   watchSessionsDir();
+  watchConfig();
   startSessionLifecycleWatcher();
   installControlSignals();
   // Tick to detect working->idle demotion without relying on fs events.
@@ -367,6 +461,9 @@ app.whenReady().then(() => {
 app.on('before-quit', () => {
   if (watcher) {
     try { watcher.close(); } catch (_) {}
+  }
+  if (configWatcher) {
+    try { configWatcher.close(); } catch (_) {}
   }
   try {
     fs.unlinkSync(path.join(DATA_DIR, 'app.pid'));
