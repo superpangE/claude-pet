@@ -35,13 +35,22 @@ body:active { cursor: grabbing; }
   opacity: 1;
 }
 
-/* User-supplied art: just stretch to fit the window, preserve aspect. */
+/* User-supplied art: fill the scene, preserve aspect. Width/height = 100%
+   (not the 180px window size) so per-state padding on the wrapper actually
+   shrinks the image. */
 .custom-art {
-  width: 180px;
-  height: 180px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   display: block;
   pointer-events: none;
+}
+
+/* Leave room above the idle cat so it doesn't crash into the session badge.
+   The working animation already has enough headroom in its own art, so this
+   only applies when a custom idle image is in use. */
+.scene-idle.has-custom {
+  padding-top: 22px;
 }
 
 /* ---------- Working ---------- */
