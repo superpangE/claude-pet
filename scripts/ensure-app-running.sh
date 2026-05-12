@@ -60,6 +60,21 @@ fi
 
 # Resolve electron binary: prefer local install, fall back to PATH.
 ELECTRON_BIN="$APP_DIR/node_modules/.bin/electron"
+
+# Lazy install on first run. A fresh clone (or fresh plugin marketplace fetch)
+# arrives without pet-app/node_modules, since the dependency tree is ~100MB and
+# we don't ship it. Run npm install synchronously here so the user doesn't have
+# to know about a separate setup step. First call blocks for 1-2 minutes; later
+# calls are no-ops because the binary now exists.
+if [[ ! -x "$ELECTRON_BIN" && -f "$APP_DIR/package.json" ]]; then
+  if command -v npm >/dev/null 2>&1; then
+    echo "[claude-pet] first-time setup: installing electron deps (1-2 min)..." >>"$LOG_FILE"
+    (cd "$APP_DIR" && npm install --no-audit --no-fund) >>"$LOG_FILE" 2>&1 || true
+  else
+    echo "[claude-pet] npm not found. Install Node.js 20+ then retry." >>"$LOG_FILE"
+  fi
+fi
+
 if [[ ! -x "$ELECTRON_BIN" ]]; then
   ELECTRON_BIN="$(command -v electron || true)"
 fi

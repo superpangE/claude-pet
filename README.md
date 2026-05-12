@@ -27,57 +27,55 @@
 
 > Linux/Windows는 아직 미지원 (`setVisibleOnAllWorkspaces` 등 macOS 전용 코드 사용).
 
-### 1. 저장소 받기
+### 권장 — GitHub 마켓플레이스 (2줄)
 
-```sh
-git clone https://github.com/<your-account>/claude-pet.git
-cd claude-pet
+Claude Code 안에서:
+
 ```
-
-### 2. Electron 의존성 설치
-
-```sh
-cd pet-app
-npm install
-cd ..
-```
-
-설치된 `pet-app/node_modules/.bin/electron`을 우선 사용한다. 없으면 `PATH`의 `electron` 으로 fallback.
-
-### 3. 플러그인 등록
-
-**Option A — 한 세션만 띄우고 싶을 때 (가장 빠름):**
-
-```sh
-claude --plugin-dir /path/to/claude-pet
-```
-
-**Option B — 영구 설치 (로컬 마켓플레이스 경유):**
-
-```sh
-# 마켓플레이스 등록 (1회):
-claude plugin marketplace add /path/to/claude-pet
-# 플러그인 설치:
-claude plugin install claude-pet@claude-pet-local
+/plugin marketplace add superpangE/claude-pet
+/plugin install claude-pet@claude-pet
 ```
 
 확인:
 
-```sh
-claude plugin list
+```
+/plugin
 ```
 
-`claude-pet@claude-pet-local` 항목이 enabled로 보이면 끝.
+`claude-pet@claude-pet` 가 enabled면 끝. 첫 세션 시작 시 `pet-app/node_modules`가 없으면 자동으로 `npm install`이 실행된다 (1~2분 소요, 한 번만).
+
+### 개발자용 — 로컬 클론
+
+저장소를 직접 만지고 싶다면:
+
+```sh
+git clone https://github.com/superpangE/claude-pet.git
+cd claude-pet
+cd pet-app && npm install && cd ..
+```
+
+세 가지 등록 방식 중 택1:
+
+```sh
+# A. 한 세션만 (가장 빠름)
+claude --plugin-dir /path/to/claude-pet
+
+# B. 로컬 directory 마켓플레이스
+claude plugin marketplace add /path/to/claude-pet
+claude plugin install claude-pet@claude-pet
+```
+
+설치된 `pet-app/node_modules/.bin/electron`을 우선 사용한다. 없으면 `PATH`의 `electron` 으로 fallback.
 
 ### 🗑 제거
 
 ```sh
 # 1. 일시적으로 끄기 (다시 켤 가능성이 있을 때)
-claude plugin disable claude-pet@claude-pet-local
+claude plugin disable claude-pet@claude-pet
 
 # 2. 완전 제거
-claude plugin uninstall claude-pet@claude-pet-local
-claude plugin marketplace remove claude-pet-local
+claude plugin uninstall claude-pet@claude-pet
+claude plugin marketplace remove claude-pet
 
 # 3. 런타임 데이터까지 지우기 (선택)
 rm -rf ~/.claude/plugins/claude-pet/

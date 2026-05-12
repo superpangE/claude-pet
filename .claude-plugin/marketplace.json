@@ -1,5 +1,5 @@
 {
-  "name": "claude-pet-local",
+  "name": "claude-pet",
   "owner": {
     "name": "superpangE"
   },
@@ -8,7 +8,7 @@
       "name": "claude-pet",
       "source": "./",
       "description": "Floating cat that reacts to Claude Code activity",
-      "version": "0.3.3"
+      "version": "0.4.0"
     }
   ]
 }
