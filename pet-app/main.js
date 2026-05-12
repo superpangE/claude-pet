@@ -3,6 +3,15 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+// OS-level single-instance guarantee. Two hook scripts firing
+// ensure-app-running.sh within the same millisecond can both win the PID-file
+// race and spawn two Electrons. This lock makes the second one self-quit
+// before it shows a window.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  process.exit(0);
+}
+
 const DATA_DIR =
   process.env.CLAUDE_PET_DATA_DIR ||
   path.join(os.homedir(), '.claude', 'plugins', 'claude-pet', 'data');
