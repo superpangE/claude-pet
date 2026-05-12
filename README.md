@@ -10,7 +10,8 @@
 |------|------|-----|
 | `working` | Claude가 작업 중 (UserPromptSubmit ~ Stop 사이, 또는 도구 사용 중) | 발 두드리는 고양이 (기본 SVG, `working.gif` 있으면 교체) |
 | `idle` | 사용자 응답을 기다리거나 작업이 끝난 상태 | 자는 고양이 (기본 SVG, `idle.png` 있으면 교체) |
-| `attention` 배지 | Claude가 권한/입력을 기다리는 `Notification` hook 직후 | 노란 `!` 펄스 (다음 활동 시 자동 해제) |
+
+> 여러 세션이 있으면 머리 위 작은 배지에 `●`(working) / `○`(idle) 도트로 표시 (단일 세션은 배지 숨김).
 
 > 인터럽트(ESC)·`SIGHUP`(터미널 창 강제 닫기)·`SIGKILL` 같은 경로에서는 Claude Code가 Stop / SessionEnd hook을 보장하지 않는다. claude-pet은 마지막 heartbeat 시점으로부터 5분이 지나면 자동으로 idle로 강등한다 (`WORKING_MAX_MS`).
 

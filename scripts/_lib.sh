@@ -34,8 +34,6 @@ sanitize_sid() {
 # write_session_state <state-name> <payload-json>
 # Atomically writes sessions/<sid>.json. The Electron app watches the directory
 # and aggregates across all session files (priority: working > idle).
-# Side effect: clears any pending attention flag, since user-driven activity
-# (UserPromptSubmit / ToolUse / Stop) means the prior Notification was handled.
 write_session_state() {
   local new_state="$1"
   local payload="$2"
@@ -59,24 +57,7 @@ write_session_state() {
 }
 EOF
   mv "$tmp" "$target"
-  rm -f "$SESSIONS_DIR/$session_id.attention"
   log "session=${session_id} state=${new_state}"
-}
-
-# Mark the session as needing user attention (e.g., permission prompt).
-# Stored as a sibling marker file so the main state write stays a single
-# atomic op. Cleared by the next write_session_state call.
-mark_session_attention() {
-  local payload="$1"
-  local parsed session_id
-  parsed="$(parse_payload "$payload")"
-  session_id="$(sanitize_sid "${parsed%%|*}")"
-  if [[ -z "$session_id" ]]; then
-    log "skip attention: missing session_id"
-    return 0
-  fi
-  : >"$SESSIONS_DIR/$session_id.attention"
-  log "session=${session_id} attention"
 }
 
 # Remove the per-session state file. Called from on-session-end.sh.
@@ -84,7 +65,7 @@ mark_session_ended() {
   local sid
   sid="$(sanitize_sid "$1")"
   [[ -z "$sid" ]] && return 0
-  rm -f "$SESSIONS_DIR/$sid.json" "$SESSIONS_DIR/$sid.attention"
+  rm -f "$SESSIONS_DIR/$sid.json"
   log "session end: $sid"
 }
 

@@ -16,7 +16,6 @@ function applyState(payload) {
 
 function renderBadge(payload) {
   if (!badgeEl) return;
-  const attention = !!(payload && payload.attention);
   const states = payload && payload.sessionStates;
 
   let dots = '';
@@ -28,19 +27,13 @@ function renderBadge(payload) {
     dots = overflow > 0 ? `${inner}+${overflow}` : inner;
   }
 
-  badgeEl.replaceChildren();
-  if (attention) {
-    const bang = document.createElement('span');
-    bang.className = 'bang';
-    bang.textContent = '!';
-    badgeEl.appendChild(bang);
-    if (dots) badgeEl.append(' ' + dots);
-  } else if (dots) {
+  if (dots) {
     badgeEl.textContent = dots;
+    badgeEl.classList.add('visible');
+  } else {
+    badgeEl.replaceChildren();
+    badgeEl.classList.remove('visible');
   }
-
-  if (attention || dots) badgeEl.classList.add('visible');
-  else badgeEl.classList.remove('visible');
 }
 
 function tryLoadCustom(state, exts, scene) {

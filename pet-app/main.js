@@ -41,7 +41,7 @@ let mainWindow = null;
 let tray = null;
 let watcher = null;
 let pushTimer = null;
-let currentAggregate = { state: 'idle', sessionCount: 0, breakdown: {}, sessionStates: [], attention: false };
+let currentAggregate = { state: 'idle', sessionCount: 0, breakdown: {}, sessionStates: [] };
 
 function ensureDataDir() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -57,14 +57,7 @@ function readActiveSessions() {
   }
   const now = Date.now();
   const cutoffSec = (now - STALE_MS) / 1000;
-  const attentionSids = new Set();
-  for (const name of entries) {
-    if (name.endsWith('.attention')) {
-      attentionSids.add(name.slice(0, -'.attention'.length));
-    }
-  }
   const out = [];
-  const liveSids = new Set();
   for (const name of entries) {
     if (!name.endsWith('.json')) continue;
     const full = path.join(SESSIONS_DIR, name);
@@ -73,18 +66,15 @@ function readActiveSessions() {
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed.state !== 'string') continue;
       if (typeof parsed.updated_at === 'number' && parsed.updated_at < cutoffSec) continue;
-      parsed.attention = attentionSids.has(parsed.session_id);
       out.push(parsed);
-      liveSids.add(parsed.session_id);
     } catch (_) {
       // partial write or malformed — skip this round, will recheck on next event
     }
   }
-  // GC: drop attention markers whose .json is gone (orphan) or stale-filtered.
-  // Keeps disk clean across long runs without an explicit sweep job.
-  for (const sid of attentionSids) {
-    if (liveSids.has(sid)) continue;
-    try { fs.unlinkSync(path.join(SESSIONS_DIR, sid + '.attention')); } catch (_) {}
+  // GC leftover .attention markers from older plugin versions.
+  for (const name of entries) {
+    if (!name.endsWith('.attention')) continue;
+    try { fs.unlinkSync(path.join(SESSIONS_DIR, name)); } catch (_) {}
   }
   return out;
 }
@@ -122,15 +112,14 @@ function aggregateState() {
     ...Array(breakdown.working).fill('working'),
     ...Array(breakdown.idle).fill('idle'),
   ];
-  const attention = effective.some((s) => s.attention === true);
   if (effective.length === 0) {
-    return { state: 'idle', sessionCount: 0, breakdown, sessionStates, attention: false };
+    return { state: 'idle', sessionCount: 0, breakdown, sessionStates };
   }
   let winner = 'idle';
   for (const s of effective) {
     if ((PRIORITY[s.state] || 0) > (PRIORITY[winner] || 0)) winner = s.state;
   }
-  return { state: winner, sessionCount: effective.length, breakdown, sessionStates, attention };
+  return { state: winner, sessionCount: effective.length, breakdown, sessionStates };
 }
 
 function pushState() {
@@ -170,8 +159,7 @@ setInterval(() => {
     const next = aggregateState();
     if (
       next.state !== currentAggregate.state ||
-      next.sessionCount !== currentAggregate.sessionCount ||
-      next.attention !== currentAggregate.attention
+      next.sessionCount !== currentAggregate.sessionCount
     ) {
       dlog(`[claude-pet] poll detected change ${currentAggregate.state} -> ${next.state}`);
       pushState();

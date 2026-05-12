@@ -123,15 +123,3 @@ body:active { cursor: grabbing; }
 .session-badge.visible {
   opacity: 1;
 }
-
-.session-badge .bang {
-  color: #f5b800;
-  font-weight: 800;
-  margin-right: 2px;
-  animation: bang-pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes bang-pulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.55; }
-}
