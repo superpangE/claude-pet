@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
-# Send a control signal to the running pet Electron process.
+# Send a control signal to running pet Electron processes.
 # Usage: pet-control.sh show|hide
 #
 # SIGUSR1 -> hide window, SIGUSR2 -> show window. main.js wires these up.
-# If the app isn't running, "show" spawns it; "hide" is a no-op.
+# Enumerates all pet wrappers via ps pattern match (not the PID file alone),
+# so duplicate or leftover instances all get toggled. The PID file is
+# advisory only and may drift (race on spawn, stale after crash, or shared
+# between old/new plugin versions writing the same data dir).
 set -u
 
 CMD="${1:-}"
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$DIR/.." && pwd)}"
-DATA_DIR="${CLAUDE_PET_DATA_DIR:-$HOME/.claude/plugins/claude-pet/data}"
-PID_FILE="$DATA_DIR/app.pid"
 
 case "$CMD" in
   show|hide) ;;
@@ -20,55 +21,55 @@ case "$CMD" in
     ;;
 esac
 
-pid=""
-if [[ -f "$PID_FILE" ]]; then
-  pid="$(cat "$PID_FILE" 2>/dev/null || true)"
-fi
+# All pet wrapper PIDs (node electron shim). Identified by command shape:
+# argv[0]=node, argv[1] is the local electron binary, argv[2] is a pet-app
+# dir. Field-level match (not whole-line substring) avoids false positives.
+find_pet_pids() {
+  ps -axo pid=,command= 2>/dev/null \
+    | awk '
+        $2 == "node" \
+          && $3 ~ /\/node_modules\/\.bin\/electron$/ \
+          && $4 ~ /\/pet-app\/?$/ {
+          print $1
+        }'
+}
 
-# Verify PID actually points at our pet wrapper, not a recycled unrelated PID.
-if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
-  cmd="$(ps -p "$pid" -o command= 2>/dev/null || true)"
-  if [[ "$cmd" != *"/pet-app"* || "$cmd" != *"node_modules/.bin/electron"* ]]; then
-    pid=""  # PID is alive but not us — treat as not-running
-  fi
-fi
+WRAPPERS=()
+while IFS= read -r p; do
+  [[ -n "$p" ]] && WRAPPERS+=("$p")
+done < <(find_pet_pids)
 
-# Pet is running: signal it. Even if kill fails (rare: same-user perms),
-# do NOT fall through to spawn — that would create an orphan second app.
-#
-# PID file holds the node `electron` launcher (the npm shim). It does NOT
-# forward SIGUSR1/USR2 to the Electron binary it spawned, so signaling the
-# wrapper is a no-op. Resolve its direct child (the Electron main process)
-# and signal that instead.
-if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
-  target_pid="$(pgrep -P "$pid" 2>/dev/null | head -n1)"
-  if [[ -z "$target_pid" ]]; then
-    # Fall back to wrapper PID; better to try than to drop the request.
-    target_pid="$pid"
+if [[ ${#WRAPPERS[@]} -eq 0 ]]; then
+  if [[ "$CMD" == "show" ]]; then
+    "$PLUGIN_ROOT/scripts/ensure-app-running.sh"
+    echo "pet: starting"
+    exit 0
   fi
-  if [[ "$CMD" == "hide" ]]; then
-    if kill -USR1 "$target_pid" 2>/dev/null; then
-      echo "pet: hidden"
-    else
-      echo "pet: signal failed (pid $target_pid)" >&2
-      exit 1
-    fi
-  else
-    if kill -USR2 "$target_pid" 2>/dev/null; then
-      echo "pet: shown"
-    else
-      echo "pet: signal failed (pid $target_pid)" >&2
-      exit 1
-    fi
-  fi
+  echo "pet: not running (nothing to hide)"
   exit 0
 fi
 
-# Pet is not running.
+SIG=USR1
+LABEL=hidden
 if [[ "$CMD" == "show" ]]; then
-  "$PLUGIN_ROOT/scripts/ensure-app-running.sh"
-  echo "pet: starting"
-  exit 0
+  SIG=USR2
+  LABEL=shown
 fi
-echo "pet: not running (nothing to hide)"
+
+fail=0
+for wrapper in "${WRAPPERS[@]}"; do
+  # The node shim does NOT forward SIGUSR1/USR2 to the Electron binary it
+  # spawned. Resolve its direct child (Electron main) and signal that.
+  child="$(pgrep -P "$wrapper" 2>/dev/null | head -n1)"
+  target="${child:-$wrapper}"
+  if ! kill -"$SIG" "$target" 2>/dev/null; then
+    fail=$((fail + 1))
+  fi
+done
+
+if [[ $fail -eq ${#WRAPPERS[@]} ]]; then
+  echo "pet: signal failed (${#WRAPPERS[@]} pid(s))" >&2
+  exit 1
+fi
+echo "pet: $LABEL (${#WRAPPERS[@]} instance(s))"
 exit 0
