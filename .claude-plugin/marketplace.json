@@ -1,0 +1,14 @@
+{
+  "name": "claude-pet-local",
+  "owner": {
+    "name": "superpangE"
+  },
+  "plugins": [
+    {
+      "name": "claude-pet",
+      "source": "./",
+      "description": "Floating cat that reacts to Claude Code activity",
+      "version": "0.3.3"
+    }
+  ]
+}

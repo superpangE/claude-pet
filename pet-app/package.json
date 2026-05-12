@@ -1,0 +1,13 @@
+{
+  "name": "claude-pet-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Floating cat overlay for the claude-pet plugin",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "electron": "^32.0.0"
+  }
+}
