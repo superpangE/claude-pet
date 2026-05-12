@@ -210,7 +210,7 @@ rm ~/.claude/plugins/claude-pet/data/sessions/manual.json
 
 ## 🩺 트러블슈팅
 
-- **고양이가 안 뜬다.** `data/app.log` 확인. 대부분 `electron not found` — `cd pet-app && npm install`.
+- **고양이가 안 뜬다.** 새 세션 시작 시 SessionStart hook이 `node` / `npm` 누락 / 구버전이면 채팅창에 사유를 표시한다. 메시지에 따라 [nodejs.org](https://nodejs.org/)에서 Node 20+ 설치 후 새 세션 시작. 그래도 안 뜨면 `data/app.log` 확인 (`electron not found`이면 `cd pet-app && npm install`).
 - **상태가 안 바뀐다.** `data/hook.log` 확인. hook이 안 찍히면 플러그인이 등록 안 됐거나 비활성 상태.
 - **다른 창 뒤로 숨는다.** macOS가 floating 창을 Mission Control 진입 시 가끔 강등시킴. 트레이 → Show/Hide 토글로 다시 promote.
 - **영원히 없애고 싶다.** [제거 섹션](#-제거) 참고.
