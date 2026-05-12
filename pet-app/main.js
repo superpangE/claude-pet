@@ -54,7 +54,7 @@ let tray = null;
 let watcher = null;
 let configWatcher = null;
 let pushTimer = null;
-let currentTheme = DEFAULT_THEME;
+let currentThemes = { idle: DEFAULT_THEME, working: DEFAULT_THEME };
 let currentAggregate = { state: 'idle', sessionCount: 0, breakdown: {}, sessionStates: [] };
 
 function ensureDataDir() {
@@ -92,31 +92,55 @@ function listThemes() {
   return valid;
 }
 
+// Normalize the persisted form into { idle, working }. Accepts:
+//   { "theme": "cat" }                          (legacy, both states the same)
+//   { "theme": { "idle": "cat", "working": "dog" } }
 function readConfig() {
+  let parsed = null;
   try {
-    const raw = fs.readFileSync(CONFIG_FILE, 'utf8');
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed.theme === 'string') return parsed;
+    parsed = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
   } catch (_) {}
-  return { theme: DEFAULT_THEME };
+  return normalizeThemes(parsed && parsed.theme);
 }
 
-function writeConfig(cfg) {
+function normalizeThemes(theme) {
+  const themes = listThemes();
+  const pick = (v) => (typeof v === 'string' && themes.includes(v)) ? v : DEFAULT_THEME;
+  if (typeof theme === 'string') {
+    const v = pick(theme);
+    return { idle: v, working: v };
+  }
+  if (theme && typeof theme === 'object') {
+    return { idle: pick(theme.idle), working: pick(theme.working) };
+  }
+  return { idle: DEFAULT_THEME, working: DEFAULT_THEME };
+}
+
+function writeConfig(themes) {
   try {
     const tmp = `${CONFIG_FILE}.${process.pid}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(cfg, null, 2));
+    // Collapse to legacy string form when both states match — keeps the
+    // common case readable.
+    const value = themes.idle === themes.working
+      ? themes.idle
+      : { idle: themes.idle, working: themes.working };
+    fs.writeFileSync(tmp, JSON.stringify({ theme: value }, null, 2));
     fs.renameSync(tmp, CONFIG_FILE);
   } catch (e) {
     console.error('[claude-pet] writeConfig failed:', e);
   }
 }
 
-function applyTheme(theme, { persist } = { persist: false }) {
-  const themes = listThemes();
-  const next = themes.includes(theme) ? theme : DEFAULT_THEME;
-  if (next === currentTheme && !persist) return;
-  currentTheme = next;
-  if (persist) writeConfig({ theme: next });
+// applyTheme accepts a partial { idle?, working? } and merges into current.
+function applyTheme(patch, { persist } = { persist: false }) {
+  const next = normalizeThemes({
+    idle: patch && typeof patch.idle === 'string' ? patch.idle : currentThemes.idle,
+    working: patch && typeof patch.working === 'string' ? patch.working : currentThemes.working,
+  });
+  const same = next.idle === currentThemes.idle && next.working === currentThemes.working;
+  if (same && !persist) return;
+  currentThemes = next;
+  if (persist) writeConfig(next);
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('pet:theme', next);
   }
@@ -130,8 +154,7 @@ function watchConfig() {
   try {
     configWatcher = fs.watch(DATA_DIR, (_evt, filename) => {
       if (!filename || path.basename(filename) !== 'config.json') return;
-      const cfg = readConfig();
-      applyTheme(cfg.theme, { persist: false });
+      applyTheme(readConfig(), { persist: false });
     });
   } catch (_) {}
 }
@@ -398,12 +421,21 @@ function buildTrayMenu() {
     },
     { type: 'separator' },
     {
-      label: 'Pet',
+      label: 'Pet (idle)',
       submenu: listThemes().map((name) => ({
         label: name,
         type: 'radio',
-        checked: name === currentTheme,
-        click: () => applyTheme(name, { persist: true }),
+        checked: name === currentThemes.idle,
+        click: () => applyTheme({ idle: name }, { persist: true }),
+      })),
+    },
+    {
+      label: 'Pet (working)',
+      submenu: listThemes().map((name) => ({
+        label: name,
+        type: 'radio',
+        checked: name === currentThemes.working,
+        click: () => applyTheme({ working: name }, { persist: true }),
       })),
     },
     { type: 'separator' },
@@ -425,7 +457,7 @@ function createTray() {
 }
 
 ipcMain.handle('pet:get-state', () => aggregateState());
-ipcMain.handle('pet:get-theme', () => currentTheme);
+ipcMain.handle('pet:get-theme', () => currentThemes);
 
 // scripts/pet-control.sh sends these to toggle visibility from the
 // /pet slash command. SIGUSR1 = hide, SIGUSR2 = show.
@@ -445,8 +477,7 @@ function installControlSignals() {
 app.whenReady().then(() => {
   ensureDataDir();
   // Load persisted theme before the window opens so the first render uses it.
-  currentTheme = readConfig().theme || DEFAULT_THEME;
-  if (!listThemes().includes(currentTheme)) currentTheme = DEFAULT_THEME;
+  currentThemes = readConfig();
   if (process.platform === 'darwin' && app.dock) app.dock.hide();
   createWindow();
   createTray();

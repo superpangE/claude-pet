@@ -1,6 +1,6 @@
 {
   "name": "claude-pet",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Floating cat that reacts to Claude Code activity (working / idle, with multi-session dots badge and /pet show|hide)",
   "author": {
     "name": "superpangE"

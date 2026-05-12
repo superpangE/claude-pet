@@ -7,7 +7,7 @@ const DEFAULT_THEME = 'cat';
 
 const petEl = document.getElementById('pet');
 const badgeEl = document.getElementById('session-badge');
-let currentTheme = null;
+const loadedTheme = { idle: null, working: null };
 
 function applyState(payload) {
   const raw = payload && payload.state;
@@ -95,11 +95,30 @@ async function loadScene(state, theme) {
   scene.classList.remove('has-svg');
 }
 
-async function applyTheme(theme) {
-  const t = (theme && typeof theme === 'string') ? theme : DEFAULT_THEME;
-  if (t === currentTheme) return;
-  currentTheme = t;
-  await Promise.all([loadScene('working', t), loadScene('idle', t)]);
+// theme can be either:
+//   string                              (legacy — both states the same)
+//   { idle: "cat", working: "dog" }     (per-state)
+function normalizeTheme(theme) {
+  if (typeof theme === 'string') return { idle: theme, working: theme };
+  if (theme && typeof theme === 'object') {
+    return {
+      idle: typeof theme.idle === 'string' ? theme.idle : DEFAULT_THEME,
+      working: typeof theme.working === 'string' ? theme.working : DEFAULT_THEME,
+    };
+  }
+  return { idle: DEFAULT_THEME, working: DEFAULT_THEME };
+}
+
+async function applyTheme(rawTheme) {
+  const next = normalizeTheme(rawTheme);
+  const jobs = [];
+  for (const state of ['idle', 'working']) {
+    if (loadedTheme[state] !== next[state]) {
+      loadedTheme[state] = next[state];
+      jobs.push(loadScene(state, next[state]));
+    }
+  }
+  await Promise.all(jobs);
 }
 
 window.pet.onState((payload) => applyState(payload));

@@ -134,14 +134,23 @@ priority: working > idle
 
 ### 기본 제공 캐릭터
 
-`cat` / `dog` / `bunny` 3종 내장. 트레이 → **Pet** 서브메뉴에서 즉시 전환, 또는:
+`cat` / `dog` / `bunny` 3종 내장. **idle 상태와 working 상태를 따로 지정 가능** — 작업 중일 땐 dog, 쉴 땐 cat 같은 조합. 트레이 → **Pet (idle)** / **Pet (working)** 두 서브메뉴 각각에서 라디오로 선택, 또는:
 
 ```
-/pet list           # 사용 가능한 캐릭터 목록
-/pet set dog        # 즉시 전환 + 영구 저장 (config.json)
+/pet list                       # 현재 idle/working + 사용 가능 목록
+/pet set dog                    # 두 상태 모두 dog
+/pet set idle cat               # idle만 cat
+/pet set working dog            # working만 dog
+/pet set                        # 인자 없이 호출 → Claude가 라디오 질문 띄움
 ```
 
-선택은 `~/.claude/plugins/claude-pet/data/config.json` 에 `{"theme":"dog"}` 형태로 저장. 재시작 후에도 유지.
+`/pet set` 빈 인자 호출 시 슬래시 커맨드 자체는 인터랙티브 라디오를 못 띄우므로, 스크립트가 `PET_PICK` 블록을 출력하고 Claude(LLM)가 그 출력을 받아 `AskUserQuestion`으로 라디오 질문을 띄운다.
+
+저장 형태:
+- 두 상태 동일: `{"theme":"cat"}`
+- 두 상태 다름: `{"theme":{"idle":"cat","working":"dog"}}`
+
+경로: `~/.claude/plugins/claude-pet/data/config.json`. 재시작 후에도 유지.
 
 ### 내 그림으로 바꾸기 / 새 캐릭터 추가
 
