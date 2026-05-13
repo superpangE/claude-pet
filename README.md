@@ -148,13 +148,13 @@ priority: working > idle
 
 ### 기본 제공 캐릭터
 
-`cat` / `dog` / `bunny` 3종 내장. **idle 상태와 working 상태를 따로 지정 가능** — 작업 중일 땐 dog, 쉴 땐 cat 같은 조합. 트레이 → **Pet (idle)** / **Pet (working)** 두 서브메뉴 각각에서 라디오로 선택, 또는:
+`cat` 1종 내장. 사용자가 `pet-app/assets/pets/<name>/` 폴더를 추가하면 자동 발견되어 트레이/슬래시에 등장. **idle 상태와 working 상태를 따로 지정 가능** — 작업 중일 땐 A, 쉴 땐 B 같은 조합. 트레이 → **Pet (idle)** / **Pet (working)** 두 서브메뉴 각각에서 라디오로 선택, 또는:
 
 ```
 /pet list                       # 현재 idle/working + 사용 가능 목록
-/pet set dog                    # 두 상태 모두 dog
-/pet set idle cat               # idle만 cat
-/pet set working dog            # working만 dog
+/pet set cat                    # 두 상태 모두 cat
+/pet set idle <name>            # idle만
+/pet set working <name>         # working만
 /pet set                        # 인자 없이 호출 → Claude가 라디오 질문 띄움
 ```
 
