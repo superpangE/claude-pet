@@ -25,8 +25,11 @@ const WIN_SIZE = { width: 180, height: 180 };
 // Quit if no active CC sessions for this many ms.
 const IDLE_QUIT_GRACE_MS = 8000;
 const SESSION_POLL_MS = 2000;
-// Session files older than this are treated as dead (terminal SIGKILL'd).
-const STALE_MS = 4 * 60 * 60 * 1000;
+// Session files older than this are treated as dead (terminal SIGKILL'd,
+// window closed, SSH dropped — anywhere SessionEnd doesn't fire). Hooks
+// refresh updated_at on every prompt / tool / Stop, so a live session won't
+// age past this unless the user is truly idle.
+const STALE_MS = 15 * 60 * 1000;
 // Upper bound for a "working" session without any heartbeat. PreToolUse /
 // PostToolUse refresh updated_at while tools run, so this only kicks in when
 // the run is genuinely stuck or interrupted (ESC / SIGHUP / window-close where
@@ -176,7 +179,11 @@ function readActiveSessions() {
       const raw = fs.readFileSync(full, 'utf8');
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed.state !== 'string') continue;
-      if (typeof parsed.updated_at === 'number' && parsed.updated_at < cutoffSec) continue;
+      if (typeof parsed.updated_at === 'number' && parsed.updated_at < cutoffSec) {
+        // Stale: SessionEnd never fired (terminal SIGKILL, window close, SSH drop).
+        try { fs.unlinkSync(full); } catch (_) {}
+        continue;
+      }
       out.push(parsed);
     } catch (_) {
       // partial write or malformed — skip this round, will recheck on next event
