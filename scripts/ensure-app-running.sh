@@ -40,22 +40,63 @@ pid_is_our_pet() {
   [[ "$cmd" == *"/pet-app"* && "$cmd" == *"node_modules/.bin/electron"* ]]
 }
 
+# Cache path of the running pet (cmdline points at .../<version>/pet-app...).
+# Compared against the currently-active $APP_DIR to detect a stale running
+# pet from a previous plugin version.
+pid_app_dir() {
+  local pid="$1"
+  ps -p "$pid" -o command= 2>/dev/null \
+    | sed -E 's|.*/node_modules/\.bin/electron[[:space:]]+([^[:space:]]+/pet-app)/?.*|\1|'
+}
+
+kill_stale_pet() {
+  local pid="$1"
+  [[ -z "$pid" ]] && return 0
+  # SIGTERM first so before-quit can clean app.pid; SIGKILL as fallback.
+  kill "$pid" 2>/dev/null || true
+  pkill -P "$pid" 2>/dev/null || true
+  local i
+  for i in 1 2 3 4 5; do
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 0.2
+  done
+  kill -9 "$pid" 2>/dev/null || true
+  pkill -9 -P "$pid" 2>/dev/null || true
+  rm -f "$PID_FILE"
+}
+
 # Already running per PID file?
 if [[ -f "$PID_FILE" ]]; then
   pid="$(cat "$PID_FILE" 2>/dev/null || true)"
   if pid_is_our_pet "$pid"; then
-    exit 0
+    running_app_dir="$(pid_app_dir "$pid")"
+    # Compare normalized paths (strip trailing slash).
+    want="${APP_DIR%/}"
+    got="${running_app_dir%/}"
+    if [[ "$want" == "$got" ]]; then
+      exit 0
+    fi
+    echo "[claude-pet] stale pet (running=$got, current=$want) — restarting" >>"$LOG_FILE"
+    kill_stale_pet "$pid"
+    # Fall through to the spawn path below.
   fi
 fi
 
-# PID file missing/stale, but a previous run might still be alive (e.g., user
-# spawned manually, prior crash before PID write). Adopt it instead of forking
-# a duplicate.
+# PID file missing or stale. Check for an orphaned wrapper from a previous
+# crash / manual spawn.
 existing="$(find_running_pet || true)"
 if [[ -n "$existing" ]]; then
-  echo "$existing" >"$PID_FILE"
-  echo "[claude-pet] adopted existing pet pid=$existing" >>"$LOG_FILE"
-  exit 0
+  running_app_dir="$(pid_app_dir "$existing")"
+  want="${APP_DIR%/}"
+  got="${running_app_dir%/}"
+  if [[ "$want" == "$got" ]]; then
+    echo "$existing" >"$PID_FILE"
+    echo "[claude-pet] adopted existing pet pid=$existing" >>"$LOG_FILE"
+    exit 0
+  fi
+  # Different version. Replace it.
+  echo "[claude-pet] orphan pet from old version ($got) — restarting" >>"$LOG_FILE"
+  kill_stale_pet "$existing"
 fi
 
 # Resolve electron binary: prefer local install, fall back to PATH.
