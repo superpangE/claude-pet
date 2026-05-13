@@ -68,6 +68,19 @@ claude plugin install claude-pet@claude-pet
 
 설치된 `pet-app/node_modules/.bin/electron`을 우선 사용한다. 없으면 `PATH`의 `electron` 으로 fallback.
 
+### 🔄 업데이트
+
+Claude Code 안에서:
+
+```
+/plugin marketplace update claude-pet     # GitHub에서 최신 manifest 가져오기
+/plugin update claude-pet@claude-pet      # 새 버전 캐시에 설치
+/reload-plugins                           # hook 경로가 새 버전을 가리키도록 메모리 reload
+kill $(pgrep -f "node.*pet-app/node_modules/.bin/electron") 2>/dev/null || true
+```
+
+마지막 줄은 떠 있는 펫(구버전 코드)을 종료한다. 다음 hook 발화 시 새 버전으로 자동 spawn. `/reload-plugins`를 빠뜨리면 hook이 구 버전 경로를 가리키는 채로 남아 옛 펫이 또 뜰 수 있음.
+
 ### 🗑 제거
 
 ```sh
